@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดการร้านเกม</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Sarabun', sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="time"],
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 15px;
+            margin: 10px 0;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .btn-warning {
+            background-color: #ffc107;
+            color: black;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .station-list {
+            display: grid;
+            gap: 15px;
+        }
+
+        .station-item {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #28a745;
+        }
+
+        .station-item.active {
+            border-left-color: #dc3545;
+        }
+
+        .station-info h3 {
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .station-info p {
+            color: #666;
+            font-size: 14px;
+            margin: 3px 0;
+        }
+
+        .station-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .error {
+            color: #dc3545;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .price-preview {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #007bff;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h2 id="formTitle">เพิ่มการเช่าใหม่</h2>
+            <form id="rentalForm">
+                <div class="form-group">
+                    <label for="customer_name">ชื่อลูกค้า</label>
+                    <input type="text" id="customer_name" name="customer_name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="station_number">หมายเลขเครื่อง</label>
+                    <input type="number" id="station_number" name="station_number" min="1" max="20" required>
+                    <div id="station_error" class="error"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="hours">จำนวนชั่วโมง</label>
+                    <input type="number" id="hours" name="hours" min="1" max="24" required>
+                </div>
+
+                <div class="form-group">
+                    <label>ประเภทเครื่อง</label>
+                    <div class="radio-group">
+                        <div>
+                            <input type="radio" id="typeVIP" name="station_type" value="VIP" checked>
+                            <label for="typeVIP">VIP (50฿/ชม.)</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="typeStandard" name="station_type" value="Standard">
+                            <label for="typeStandard">Standard (30฿/ชม.)</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="start_time">เวลาเริ่ม</label>
+                    <input type="time" id="start_time" name="start_time" required>
+                </div>
+
+                <div class="price-preview" id="pricePreview"></div>
+
+                <button type="submit" class="btn-primary" id="submitBtn">เพิ่มการเช่า</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>รายการเช่าทั้งหมด</h2>
+            <div id="stationList" class="station-list">
+                <!-- Stations will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let editingId = null;
+        const STORAGE_KEY = 'gameStationRentals';
+
+        // Load rentals from localStorage
+        function loadRentals() {
+            const rentals = localStorage.getItem(STORAGE_KEY);
+            return rentals ? JSON.parse(rentals) : [];
+        }
+
+        // Save rentals to localStorage
+        function saveRentals(rentals) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(rentals));
+        }
+
+        // Calculate rental price
+        function calculatePrice(hours, type) {
+            const rate = type === 'VIP' ? 50 : 30;
+            return hours * rate;
+        }
+
+        // Format time
+        function formatTime(timeStr) {
+            return timeStr;
+        }
+
+        // Calculate end time
+        function calculateEndTime(startTime, hours) {
+            const [h, m] = startTime.split(':');
+            const date = new Date();
+            date.setHours(parseInt(h) + parseInt(hours));
+            date.setMinutes(m);
+            return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+        }
+
+        // Check if station is available
+        function isStationAvailable(stationNumber, rentals, currentId = null) {
+            return !rentals.some(rental => 
+                rental.station_number === stationNumber && rental.id !== currentId
+            );
+        }
+
+        // Display rentals
+        function displayRentals() {
+            const rentals = loadRentals();
+            const stationList = document.getElementById('stationList');
+            
+            if (rentals.length === 0) {
+                stationList.innerHTML = '<p>ไม่มีรายการเช่า</p>';
+                return;
+            }
+
+            stationList.innerHTML = rentals.map(rental => `
+                <div class="station-item">
+                    <div class="station-info">
+                        <h3>เครื่อง #${rental.station_number} - ${rental.station_type}</h3>
+                        <p>ลูกค้า: ${rental.customer_name}</p>
+                        <p>
+                            เวลา: ${formatTime(rental.start_time)} - ${calculateEndTime(rental.start_time, rental.hours)} 
+                            (${rental.hours} ชั่วโมง)
+                        </p>
+                        <p>ราคา: ${calculatePrice(rental.hours, rental.station_type)} บาท</p>
+                    </div>
+                    <div class="station-actions">
+                        <button class="btn-warning" onclick="startEdit('${rental.id}')">แก้ไข</button>
+                        <button class="btn-danger" onclick="deleteRental('${rental.id}')">ลบ</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Update price preview
+        function updatePricePreview() {
+            const hours = document.getElementById('hours').value;
+            const type = document.querySelector('input[name="station_type"]:checked').value;
+            const price = calculatePrice(hours, type);
+            document.getElementById('pricePreview').textContent = `ราคารวม: ${price} บาท`;
+        }
+
+        // Handle form submission
+        document.getElementById('rentalForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const stationNumber = Number(formData.get('station_number'));
+            const rentals = loadRentals();
+
+            // Validate station number
+            if (!isStationAvailable(stationNumber, rentals, editingId)) {
+                document.getElementById('station_error').textContent = 'เครื่องนี้ถูกใช้งานอยู่';
+                return;
+            }
+
+            const rental = {
+                id: editingId || Date.now().toString(),
+                customer_name: formData.get('customer_name'),
+                station_number: stationNumber,
+                hours: Number(formData.get('hours')),
+                station_type: formData.get('station_type'),
+                start_time: formData.get('start_time')
+            };
+
+            if (editingId) {
+                // Update existing rental
+                const index = rentals.findIndex(r => r.id === editingId);
+                rentals[index] = rental;
+            } else {
+                // Add new rental
+                rentals.push(rental);
+            }
+
+            saveRentals(rentals);
+            resetForm();
+            displayRentals();
+        });
+
+        // Start editing a rental
+        function startEdit(id) {
+            const rentals = loadRentals();
+            const rental = rentals.find(r => r.id === id);
+            if (!rental) return;
+
+            editingId = id;
+            document.getElementById('formTitle').textContent = 'แก้ไขการเช่า';
+            document.getElementById('submitBtn').textContent = 'อัพเดทการเช่า';
+            
+            document.getElementById('customer_name').value = rental.customer_name;
+            document.getElementById('station_number').value = rental.station_number;
+            document.getElementById('hours').value = rental.hours;
+            document.querySelector(`input[name="station_type"][value="${rental.station_type}"]`).checked = true;
+            document.getElementById('start_time').value = rental.start_time;
+            
+            updatePricePreview();
+        }
+
+        // Delete a rental
+        function deleteRental(id) {
+            if (confirm('คุณแน่ใจหรือไม่ที่จะลบการเช่านี้?')) {
+                const rentals = loadRentals();
+                const updatedRentals = rentals.filter(rental => rental.id !== id);
+                saveRentals(updatedRentals);
+                displayRentals();
+            }
+        }
+
+        // Reset form
+        function resetForm() {
+            editingId = null;
+            document.getElementById('rentalForm').reset();
+            document.getElementById('formTitle').textContent = 'เพิ่มการเช่าใหม่';
+            document.getElementById('submitBtn').textContent = 'เพิ่มการเช่า';
+            document.getElementById('station_error').textContent = '';
+            
+            // Set current time as default
+            const now = new Date();
+            document.getElementById('start_time').value = 
+                `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            
+            updatePricePreview();
+        }
+
+        // Add event listeners for price preview
+        document.getElementById('hours').addEventListener('input', updatePricePreview);
+        document.querySelectorAll('input[name="station_type"]').forEach(radio => {
+            radio.addEventListener('change', updatePricePreview);
+        });
+
+        // Initialize
+        resetForm();
+        displayRentals();
+    </script>
+</body>
+</html>
